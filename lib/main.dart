@@ -1,4 +1,6 @@
 import 'dart:typed_data';
+import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:bridgefy/bridgefy.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -38,6 +40,13 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
   int _counter = 0;
   final List<String> _log = [];
   final TextEditingController _messageController = TextEditingController();
+
+  // --- WLAN/UDP ---
+  RawDatagramSocket? _udpSocket;
+  final int _wifiPort = 45454;
+  final Set<String> _wifiPeers = {};
+  String _localWifiId = "flutter-${DateTime.now().millisecondsSinceEpoch}";
+  bool _wifiRunning = false;
   
   // Notification plugin
   final FlutterLocalNotificationsPlugin _notificationsPlugin = 
@@ -63,6 +72,11 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
   @override
   void dispose() {
     _messageController.dispose();
+    // Close UDP socket if active
+    try {
+      _udpSocket?.close();
+      _udpSocket = null;
+    } catch (_) {}
     super.dispose();
   }
 
@@ -272,6 +286,87 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
     }
   }
 
+  // -------------------
+  // WLAN / UDP Functions 
+  // -------------------
+  Future<void> _startWifi() async {
+    if (_wifiRunning) return;
+    try {
+      _udpSocket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, _wifiPort, reuseAddress: true, reusePort: true);
+      _udpSocket?.broadcastEnabled = true;
+      _udpSocket?.listen((event) {
+        if (event == RawSocketEvent.read) {
+          final dg = _udpSocket?.receive();
+          if (dg == null) return;
+          final msg = utf8.decode(dg.data);
+          final addr = dg.address.address;
+          if (msg.startsWith('BluNET_DISCOVER:')) {
+            final id = msg.split(':').length > 1 ? msg.split(':')[1] : addr;
+            if (_wifiPeers.add('$id@$addr')) {
+              setState(() => _log.add('WiFi peer discovered: $id @$addr'));
+            }
+            if (_wifiPeers.add('$id@$addr')) {
+              _addLog('WiFi peer discovered: $id @$addr');
+            }
+          } else if (msg.startsWith('BluNET_MSG:')) {
+            final payload = msg.substring('BluNET_MSG:'.length);
+            setState(() => _log.add('WiFi msg from $addr: $payload'));
+            _addLog('WiFi msg from $addr: $payload');
+            _showEmergencyNotification(payload);
+          }
+        }
+      });
+
+      // send Broadcast (Discovery)
+      _udpSocket?.send(utf8.encode('BluNET_DISCOVER:$_localWifiId'), InternetAddress('255.255.255.255'), _wifiPort);
+
+      setState(() {
+        _wifiRunning = true;
+        _log.add('WiFi discovery started on UDP port $_wifiPort');
+      });
+      setState(() => _wifiRunning = true);
+      _addLog('WiFi discovery started on UDP port $_wifiPort');
+    } catch (e) {
+      setState(() => _log.add('Start WiFi failed: $e'));
+      _addLog('Start WiFi failed: $e');
+    }
+  }
+
+  Future<void> _stopWifi() async {
+    try {
+      _udpSocket?.close();
+      _udpSocket = null;
+      _wifiPeers.clear();
+      setState(() {
+        _wifiRunning = false;
+        _log.add('WiFi stopped');
+      });
+      setState(() => _wifiRunning = false);
+      _addLog('WiFi stopped');
+    } catch (e) {
+      setState(() => _log.add('Stop WiFi failed: $e'));
+      _addLog('Stop WiFi failed: $e');
+    }
+  }
+
+  Future<void> _sendWifiMessage({String message = 'Hello from WiFi'}) async {
+    if (!_wifiRunning || _udpSocket == null) {
+      setState(() => _log.add('WiFi not running'));
+      _addLog('WiFi not running');
+      return;
+    }
+    try {
+      // Broadcast as Default
+      final payload = 'BluNET_MSG:$message';
+      _udpSocket?.send(utf8.encode(payload), InternetAddress('255.255.255.255'), _wifiPort);
+      setState(() => _log.add('WiFi message broadcasted'));
+      _addLog('WiFi message broadcasted');
+    } catch (e) {
+      setState(() => _log.add('Send WiFi failed: $e'));
+      _addLog('Send WiFi failed: $e');
+    }
+  }
+
   // BridgefyDelegate Methods
   @override
   void bridgefyDidSendMessage({required String messageID}) {
@@ -472,7 +567,42 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
             ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
+
+          // WiFi Control Buttons
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _wifiRunning ? null : _startWifi,
+                  icon: const Icon(Icons.wifi),
+                  label: const Text('Start WiFi'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.all(12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _wifiRunning ? _stopWifi : null,
+                  icon: const Icon(Icons.wifi_off),
+                  label: const Text('Stop WiFi'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.all(12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () => _sendWifiMessage(message: _messageController.text.isNotEmpty ? _messageController.text.trim() : 'Hello local network ${++_counter}'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.all(12),
+                ),
+                child: const Icon(Icons.send_to_mobile),
+              ),
+            ],
+          ),
 
           // Emergency Messages Section
           Padding(
