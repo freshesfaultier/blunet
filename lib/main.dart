@@ -37,7 +37,9 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
   bool _started = false;
   int _counter = 0;
   final List<String> _log = [];
+  final List<MessageItem> _messages = [];
   final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   
   // Notification plugin
   final FlutterLocalNotificationsPlugin _notificationsPlugin = 
@@ -63,6 +65,7 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
   @override
   void dispose() {
     _messageController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -265,6 +268,16 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
           uuid: "c224fab0-9a9e-4e47-9016-4a45de15b2e8"
         ),
       );
+      
+      // Add to message history
+      setState(() {
+        _messages.insert(0, MessageItem(
+          text: messageText,
+          timestamp: DateTime.now(),
+          isSent: true,
+        ));
+      });
+      
       _addLog('Sent: $messageText');
       _messageController.clear();
     } catch (e) {
@@ -293,6 +306,16 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
     required BridgefyTransmissionMode transmissionMode,
   }) {
     final text = String.fromCharCodes(data);
+    
+    // Add to message history
+    setState(() {
+      _messages.insert(0, MessageItem(
+        text: text,
+        timestamp: DateTime.now(),
+        isSent: false,
+      ));
+    });
+    
     _addLog('📨 Received: $text');
     
     // Show native notification for received message
@@ -354,6 +377,32 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
         title: Text(widget.title),
         actions: [
           IconButton(
+            icon: const Icon(Icons.delete_outline),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Clear Message History'),
+                  content: const Text('Are you sure you want to clear all messages?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        setState(() => _messages.clear());
+                        Navigator.pop(context);
+                        _addLog('Message history cleared');
+                      },
+                      child: const Text('Clear', style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.info_outline),
             onPressed: () {
               showDialog(
@@ -384,8 +433,8 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
           // Status Card
           Container(
             width: double.infinity,
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -393,37 +442,30 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
                   _started ? Colors.green.shade600 : Colors.grey.shade600,
                 ],
               ),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
                 ),
               ],
             ),
-            child: Column(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
                   _started ? Icons.check_circle : Icons.radio_button_unchecked,
                   color: Colors.white,
-                  size: 32,
+                  size: 20,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(width: 8),
                 Text(
                   _started ? 'CONNECTED' : 'NOT CONNECTED',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _started ? 'Ready to send messages' : 'Tap Start to begin',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
                   ),
                 ),
               ],
@@ -432,16 +474,16 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
 
           // Control Buttons
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: _started ? null : _startBridgefy,
-                    icon: const Icon(Icons.play_arrow),
-                    label: const Text('Start'),
+                    icon: const Icon(Icons.play_arrow, size: 18),
+                    label: const Text('Start', style: TextStyle(fontSize: 13)),
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
                     ),
@@ -451,10 +493,10 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: _started ? _stopBridgefy : null,
-                    icon: const Icon(Icons.stop),
-                    label: const Text('Stop'),
+                    icon: const Icon(Icons.stop, size: 18),
+                    label: const Text('Stop', style: TextStyle(fontSize: 13)),
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                       backgroundColor: Colors.red,
                       foregroundColor: Colors.white,
                     ),
@@ -464,38 +506,38 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
                 ElevatedButton(
                   onPressed: _checkPeers,
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                   ),
-                  child: const Icon(Icons.people),
+                  child: const Icon(Icons.people, size: 18),
                 ),
               ],
             ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
 
           // Emergency Messages Section
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
                   '⚡ Quick Emergency Messages',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 2.5,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
+                    crossAxisCount: 3,
+                    childAspectRatio: 2.2,
+                    crossAxisSpacing: 6,
+                    mainAxisSpacing: 6,
                   ),
                   itemCount: _emergencyMessages.length,
                   itemBuilder: (context, index) {
@@ -505,16 +547,16 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: msg.color,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         elevation: 2,
                       ),
                       child: Text(
                         msg.label,
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 13,
                           fontWeight: FontWeight.bold,
                         ),
                         textAlign: TextAlign.center,
@@ -526,22 +568,22 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
             ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
 
           // Custom Message Section
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
                   '✏️ Custom Message',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
@@ -551,9 +593,10 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
                           labelText: 'Type your message',
                           hintText: 'Enter message here...',
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          prefixIcon: const Icon(Icons.message),
+                          prefixIcon: const Icon(Icons.message, size: 20),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                         onSubmitted: (text) => _sendMessage(text),
                       ),
@@ -562,12 +605,12 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
                     ElevatedButton(
                       onPressed: () => _sendMessage(_messageController.text.trim()),
                       style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(16),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: const Icon(Icons.send, size: 24),
+                      child: const Icon(Icons.send, size: 20),
                     ),
                   ],
                 ),
@@ -576,9 +619,187 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
           ),
 
           const SizedBox(height: 16),
+
+          // Message History Section
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        const Text(
+                          '📋 Message History',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade100,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${_messages.length}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue.shade700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Divider(height: 1, color: Colors.grey.shade300),
+                  Expanded(
+                    child: _messages.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.inbox_outlined,
+                                  size: 48,
+                                  color: Colors.grey.shade400,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'No messages yet',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Sent and received messages will appear here',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.separated(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.all(8),
+                            itemCount: _messages.length,
+                            separatorBuilder: (context, index) => Divider(
+                              height: 1,
+                              color: Colors.grey.shade300,
+                            ),
+                            itemBuilder: (context, index) {
+                              final message = _messages[index];
+                              return _buildMessageItem(message);
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  Widget _buildMessageItem(MessageItem message) {
+    final timeStr = _formatTime(message.timestamp);
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Direction indicator
+          Container(
+            margin: const EdgeInsets.only(right: 8, top: 2),
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: message.isSent 
+                  ? Colors.green.shade100 
+                  : Colors.blue.shade100,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(
+              message.isSent ? Icons.arrow_upward : Icons.arrow_downward,
+              size: 14,
+              color: message.isSent 
+                  ? Colors.green.shade700 
+                  : Colors.blue.shade700,
+            ),
+          ),
+          // Message content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      message.isSent ? 'SENT' : 'RECEIVED',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: message.isSent 
+                            ? Colors.green.shade700 
+                            : Colors.blue.shade700,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      timeStr,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  message.text,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTime(DateTime time) {
+    final now = DateTime.now();
+    final difference = now.difference(time);
+    
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else {
+      return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+    }
   }
 }
 
@@ -588,4 +809,16 @@ class EmergencyMessage {
   final Color color;
 
   EmergencyMessage(this.label, this.message, this.color);
+}
+
+class MessageItem {
+  final String text;
+  final DateTime timestamp;
+  final bool isSent;
+
+  MessageItem({
+    required this.text,
+    required this.timestamp,
+    required this.isSent,
+  });
 }
