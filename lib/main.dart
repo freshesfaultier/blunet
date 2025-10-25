@@ -40,9 +40,9 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
   final List<MessageItem> _messages = [];
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  
+
   // Notification plugin
-  final FlutterLocalNotificationsPlugin _notificationsPlugin = 
+  final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
   // Emergency quick messages
@@ -50,7 +50,11 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
     EmergencyMessage('🆘 SOS', 'SOS - EMERGENCY!', Colors.red),
     EmergencyMessage('🔥 Fire', 'FIRE! Need help!', Colors.orange),
     EmergencyMessage('🚑 Medical', 'Medical emergency!', Colors.pink),
-    EmergencyMessage('🚨 Help', 'HELP! Urgent assistance needed!', Colors.deepOrange),
+    EmergencyMessage(
+      '🚨 Help',
+      'HELP! Urgent assistance needed!',
+      Colors.deepOrange,
+    ),
     EmergencyMessage('⚠️ Danger', 'WARNING: Danger nearby!', Colors.amber),
     EmergencyMessage('👍 Safe', 'I am safe', Colors.green),
   ];
@@ -60,6 +64,8 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
     super.initState();
     _initializeNotifications();
     _setupBridgefy();
+    // Automatisch starten nach Initialisierung
+    _autoConnectAfterInit(); // <- DIESE ZEILE HINZUGEFÜGT
   }
 
   @override
@@ -69,23 +75,33 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
     super.dispose();
   }
 
+  // NEU: Automatische Verbindung nach Initialisierung
+  Future<void> _autoConnectAfterInit() async {
+    // Warte kurz, damit die Initialisierung abgeschlossen ist
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (_initialized && !_started) {
+      await _startBridgefy();
+    }
+  }
+
   // Initialize notifications
   Future<void> _initializeNotifications() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
-    
+
     const DarwinInitializationSettings initializationSettingsIOS =
         DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
+          requestAlertPermission: true,
+          requestBadgePermission: true,
+          requestSoundPermission: true,
+        );
 
     const InitializationSettings initializationSettings =
         InitializationSettings(
-      android: initializationSettingsAndroid,
-      iOS: initializationSettingsIOS,
-    );
+          android: initializationSettingsAndroid,
+          iOS: initializationSettingsIOS,
+        );
 
     await _notificationsPlugin.initialize(
       initializationSettings,
@@ -106,10 +122,10 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
     Importance importance = Importance.high;
     String channelId = 'emergency_messages';
     String channelName = 'Emergency Messages';
-    
+
     // Use max priority for critical emergencies
-    if (message.contains('SOS') || 
-        message.contains('EMERGENCY') || 
+    if (message.contains('SOS') ||
+        message.contains('EMERGENCY') ||
         message.contains('FIRE')) {
       priority = Priority.max;
       importance = Importance.max;
@@ -119,25 +135,25 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
 
     final AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
-      channelId,
-      channelName,
-      channelDescription: 'Emergency messages from nearby users',
-      importance: importance,
-      priority: priority,
-      showWhen: true,
-      enableVibration: true,
-      playSound: true,
-      // Make notification persistent for critical messages
-      ongoing: message.contains('SOS') || message.contains('FIRE'),
-      autoCancel: false,
-      styleInformation: BigTextStyleInformation(
-        message,
-        contentTitle: '🚨 EMERGENCY MESSAGE',
-        summaryText: 'Tap to view',
-      ),
-      // Full screen intent for critical emergencies
-      fullScreenIntent: message.contains('SOS') || message.contains('FIRE'),
-    );
+          channelId,
+          channelName,
+          channelDescription: 'Emergency messages from nearby users',
+          importance: importance,
+          priority: priority,
+          showWhen: true,
+          enableVibration: true,
+          playSound: true,
+          // Make notification persistent for critical messages
+          ongoing: message.contains('SOS') || message.contains('FIRE'),
+          autoCancel: false,
+          styleInformation: BigTextStyleInformation(
+            message,
+            contentTitle: '🚨 EMERGENCY MESSAGE',
+            summaryText: 'Tap to view',
+          ),
+          // Full screen intent for critical emergencies
+          fullScreenIntent: message.contains('SOS') || message.contains('FIRE'),
+        );
 
     const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
       presentAlert: true,
@@ -186,6 +202,11 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
         _initialized = isInit;
       });
       _addLog('Bridgefy initialized: $_initialized');
+
+      if (_initialized) {
+        // <- DIESE ZEILEN
+        await _startBridgefy(); // <- HINZUGEFÜGT
+      }
     } catch (e) {
       _addLog('Init failed: $e');
     }
@@ -265,19 +286,22 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
         data: data,
         transmissionMode: BridgefyTransmissionMode(
           type: BridgefyTransmissionModeType.mesh,
-          uuid: "c224fab0-9a9e-4e47-9016-4a45de15b2e8"
+          uuid: "c224fab0-9a9e-4e47-9016-4a45de15b2e8",
         ),
       );
-      
+
       // Add to message history
       setState(() {
-        _messages.insert(0, MessageItem(
-          text: messageText,
-          timestamp: DateTime.now(),
-          isSent: true,
-        ));
+        _messages.insert(
+          0,
+          MessageItem(
+            text: messageText,
+            timestamp: DateTime.now(),
+            isSent: true,
+          ),
+        );
       });
-      
+
       _addLog('Sent: $messageText');
       _messageController.clear();
     } catch (e) {
@@ -306,18 +330,17 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
     required BridgefyTransmissionMode transmissionMode,
   }) {
     final text = String.fromCharCodes(data);
-    
+
     // Add to message history
     setState(() {
-      _messages.insert(0, MessageItem(
-        text: text,
-        timestamp: DateTime.now(),
-        isSent: false,
-      ));
+      _messages.insert(
+        0,
+        MessageItem(text: text, timestamp: DateTime.now(), isSent: false),
+      );
     });
-    
+
     _addLog('📨 Received: $text');
-    
+
     // Show native notification for received message
     _showEmergencyNotification(text);
   }
@@ -383,7 +406,9 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
                 context: context,
                 builder: (context) => AlertDialog(
                   title: const Text('Clear Message History'),
-                  content: const Text('Are you sure you want to clear all messages?'),
+                  content: const Text(
+                    'Are you sure you want to clear all messages?',
+                  ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
@@ -395,7 +420,10 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
                         Navigator.pop(context);
                         _addLog('Message history cleared');
                       },
-                      child: const Text('Clear', style: TextStyle(color: Colors.red)),
+                      child: const Text(
+                        'Clear',
+                        style: TextStyle(color: Colors.red),
+                      ),
                     ),
                   ],
                 ),
@@ -461,7 +489,7 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  _started ? 'CONNECTED' : 'NOT CONNECTED',
+                  _started ? 'CONNECTED' : 'CONNECTING...',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -506,7 +534,10 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
                 ElevatedButton(
                   onPressed: _checkPeers,
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 16,
+                    ),
                   ),
                   child: const Icon(Icons.people, size: 18),
                 ),
@@ -524,10 +555,7 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
               children: [
                 const Text(
                   '⚡ Quick Emergency Messages',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 GridView.builder(
@@ -547,7 +575,10 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: msg.color,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 8,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -578,10 +609,7 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
               children: [
                 const Text(
                   '✏️ Custom Message',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -596,14 +624,17 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           prefixIcon: const Icon(Icons.message, size: 20),
-                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                          ),
                         ),
                         onSubmitted: (text) => _sendMessage(text),
                       ),
                     ),
                     const SizedBox(width: 8),
                     ElevatedButton(
-                      onPressed: () => _sendMessage(_messageController.text.trim()),
+                      onPressed: () =>
+                          _sendMessage(_messageController.text.trim()),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.all(16),
                         shape: RoundedRectangleBorder(
@@ -645,7 +676,10 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.blue.shade100,
                             borderRadius: BorderRadius.circular(10),
@@ -698,10 +732,8 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
                             controller: _scrollController,
                             padding: const EdgeInsets.all(8),
                             itemCount: _messages.length,
-                            separatorBuilder: (context, index) => Divider(
-                              height: 1,
-                              color: Colors.grey.shade300,
-                            ),
+                            separatorBuilder: (context, index) =>
+                                Divider(height: 1, color: Colors.grey.shade300),
                             itemBuilder: (context, index) {
                               final message = _messages[index];
                               return _buildMessageItem(message);
@@ -719,7 +751,7 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
 
   Widget _buildMessageItem(MessageItem message) {
     final timeStr = _formatTime(message.timestamp);
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       child: Row(
@@ -730,16 +762,16 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
             margin: const EdgeInsets.only(right: 8, top: 2),
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: message.isSent 
-                  ? Colors.green.shade100 
+              color: message.isSent
+                  ? Colors.green.shade100
                   : Colors.blue.shade100,
               borderRadius: BorderRadius.circular(6),
             ),
             child: Icon(
               message.isSent ? Icons.arrow_upward : Icons.arrow_downward,
               size: 14,
-              color: message.isSent 
-                  ? Colors.green.shade700 
+              color: message.isSent
+                  ? Colors.green.shade700
                   : Colors.blue.shade700,
             ),
           ),
@@ -755,8 +787,8 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
-                        color: message.isSent 
-                            ? Colors.green.shade700 
+                        color: message.isSent
+                            ? Colors.green.shade700
                             : Colors.blue.shade700,
                         letterSpacing: 0.5,
                       ),
@@ -774,10 +806,7 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
                 const SizedBox(height: 4),
                 Text(
                   message.text,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.black87,
-                  ),
+                  style: const TextStyle(fontSize: 14, color: Colors.black87),
                 ),
               ],
             ),
@@ -790,7 +819,7 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
   String _formatTime(DateTime time) {
     final now = DateTime.now();
     final difference = now.difference(time);
-    
+
     if (difference.inMinutes < 1) {
       return 'Just now';
     } else if (difference.inMinutes < 60) {
