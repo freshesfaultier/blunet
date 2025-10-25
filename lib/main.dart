@@ -765,89 +765,145 @@ class _MyHomePageState extends State<MyHomePage>
         message.text.contains('FIRE') ||
         message.text.contains('HELP');
 
-    return Align(
-      alignment: message.isSent ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
-        ),
-        decoration: BoxDecoration(
-          gradient: message.isSent
-              ? const LinearGradient(
-                  colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
-                )
-              : (isEmergency
-                    ? const LinearGradient(
-                        colors: [Color(0xFFDC2626), Color(0xFFB91C1C)],
-                      )
-                    : LinearGradient(
-                        colors: [
-                          const Color(0xFF1F2937),
-                          const Color(0xFF374151),
-                        ],
-                      )),
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(20),
-            topRight: const Radius.circular(20),
-            bottomLeft: message.isSent
-                ? const Radius.circular(20)
-                : const Radius.circular(6),
-            bottomRight: message.isSent
-                ? const Radius.circular(6)
-                : const Radius.circular(20),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color:
-                  (message.isSent
-                          ? const Color(0xFF3B82F6)
-                          : (isEmergency
-                                ? const Color(0xFFDC2626)
-                                : const Color(0xFF000000)))
-                      .withOpacity(0.2),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              message.text,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w400,
-                height: 1.4,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: message.isSent
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // Pfeil-Icon für empfangene Nachrichten (links)
+          if (!message.isSent) ...[
+            Container(
+              margin: const EdgeInsets.only(right: 6, bottom: 4),
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: isEmergency
+                    ? const Color(0xFFDC2626).withOpacity(0.2)
+                    : const Color(0xFF374151).withOpacity(0.5),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isEmergency
+                      ? const Color(0xFFDC2626).withOpacity(0.4)
+                      : Colors.white.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
+              child: Icon(
+                Icons.arrow_downward_rounded,
+                size: 14,
+                color: isEmergency
+                    ? const Color(0xFFEF4444)
+                    : Colors.white.withOpacity(0.7),
               ),
             ),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  timeStr,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w400,
-                  ),
+          ],
+
+          // Message Bubble
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.75,
+            ),
+            decoration: BoxDecoration(
+              gradient: message.isSent
+                  ? const LinearGradient(
+                      colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
+                    )
+                  : (isEmergency
+                        ? const LinearGradient(
+                            colors: [Color(0xFFDC2626), Color(0xFFB91C1C)],
+                          )
+                        : LinearGradient(
+                            colors: [
+                              const Color(0xFF1F2937),
+                              const Color(0xFF374151),
+                            ],
+                          )),
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(20),
+                topRight: const Radius.circular(20),
+                bottomLeft: message.isSent
+                    ? const Radius.circular(20)
+                    : const Radius.circular(6),
+                bottomRight: message.isSent
+                    ? const Radius.circular(6)
+                    : const Radius.circular(20),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color:
+                      (message.isSent
+                              ? const Color(0xFF3B82F6)
+                              : (isEmergency
+                                    ? const Color(0xFFDC2626)
+                                    : const Color(0xFF000000)))
+                          .withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
-                if (message.isSent) ...[
-                  const SizedBox(width: 4),
-                  Icon(
-                    Icons.done_all,
-                    size: 14,
-                    color: Colors.white.withOpacity(0.6),
-                  ),
-                ],
               ],
             ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message.text,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w400,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      timeStr,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.6),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    if (message.isSent) ...[
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.done_all,
+                        size: 14,
+                        color: Colors.white.withOpacity(0.6),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Pfeil-Icon für gesendete Nachrichten (rechts)
+          if (message.isSent) ...[
+            Container(
+              margin: const EdgeInsets.only(left: 6, bottom: 4),
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF3B82F6).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color(0xFF3B82F6).withOpacity(0.4),
+                  width: 1,
+                ),
+              ),
+              child: Icon(
+                Icons.arrow_upward_rounded,
+                size: 14,
+                color: const Color(0xFF60A5FA),
+              ),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
