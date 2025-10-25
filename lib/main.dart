@@ -116,6 +116,12 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
     }
   }
 
+  Future<void> _checkPeers() async {
+    List<String> connectedPeers = await _bridgefy.connectedPeers;
+    int len = connectedPeers.length;
+    setState(() => _log.add('connected peers: $len'));
+  }
+
   // Beispiel: Daten senden (Broadcast)
   Future<void> _sendMessage() async {
     if (!_started) {
@@ -130,7 +136,7 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
       final lastMessageId = await _bridgefy.send(
         data: data,
         transmissionMode: BridgefyTransmissionMode(
-          type: BridgefyTransmissionModeType.broadcast,
+          type: BridgefyTransmissionModeType.mesh,
           uuid: "c224fab0-9a9e-4e47-9016-4a45de15b2e8",
         ),
       );
@@ -212,6 +218,10 @@ class _MyHomePageState extends State<MyHomePage> implements BridgefyDelegate {
                 ElevatedButton(
                   onPressed: _sendMessage,
                   child: const Text('Send Message'),
+                ),
+                ElevatedButton(
+                  onPressed: _checkPeers,
+                  child: const Text('peers'),
                 ),
               ],
             ),
