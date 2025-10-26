@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:uuid/uuid.dart'; // Füge uuid: ^4.0.0 zu pubspec.yaml hinzu
 
 class MessageItem {
   final String text;
@@ -13,6 +14,7 @@ class MessageItem {
   final bool isSent;
   final double? latitude;
   final double? longitude;
+  final String messageId; // Neu: Eindeutige Message ID
 
   MessageItem({
     required this.text,
@@ -20,14 +22,15 @@ class MessageItem {
     required this.isSent,
     this.latitude,
     this.longitude,
-  });
+    String? messageId,
+  }) : messageId = messageId ?? const Uuid().v4();
 
-  // JSON Serialisierung
   Map<String, dynamic> toJson() => {
     'text': text,
     'timestamp': timestamp.toIso8601String(),
     'latitude': latitude,
     'longitude': longitude,
+    'messageId': messageId, // Neu
   };
 
   factory MessageItem.fromJson(Map<String, dynamic> json) => MessageItem(
@@ -36,6 +39,7 @@ class MessageItem {
     isSent: false,
     latitude: json['latitude'] as double?,
     longitude: json['longitude'] as double?,
+    messageId: json['messageId'] as String?, // Neu
   );
 
   bool get hasLocation => latitude != null && longitude != null;
@@ -64,7 +68,13 @@ class BridgefyController implements BridgefyDelegate {
   final List<String> _log = [];
   final List<MessageItem> _messages = [];
 
-  // Callbacks für UI-Updates
+  // NEU: Set zum Tracken bereits empfangener Message-IDs
+  final Set<String> _receivedMessageIds = {};
+
+  // NEU: Zeitlimit für alte Message-IDs (10 Minuten)
+  static const Duration _messageIdRetentionDuration = Duration(minutes: 10);
+  final Map<String, DateTime> _messageIdTimestamps = {};
+
   final VoidCallback? onStateChanged;
   final Function(String)? onLogAdded;
   final Function(MessageItem)? onMessageReceived;
@@ -77,14 +87,12 @@ class BridgefyController implements BridgefyDelegate {
     this.onMessageSent,
   });
 
-  // Getters
   bool get initialized => _initialized;
   bool get started => _started;
   int get connectedPeersCount => _connectedPeersCount;
   List<String> get log => List.unmodifiable(_log);
   List<MessageItem> get messages => List.unmodifiable(_messages);
 
-  // Emergency Messages
   final List<EmergencyMessage> emergencyMessages = [
     EmergencyMessage('🆘', 'SOS - EMERGENCY!', const Color(0xFFDC2626)),
     EmergencyMessage('🔥', 'FIRE! Need help!', const Color(0xFFEA580C)),
@@ -93,6 +101,18 @@ class BridgefyController implements BridgefyDelegate {
     EmergencyMessage('⚠️', 'WARNING: Danger!', const Color(0xFFF59E0B)),
     EmergencyMessage('✅', 'I am safe', const Color(0xFF10B981)),
   ];
+
+  // NEU: Cleanup alte Message-IDs
+  void _cleanupOldMessageIds() {
+    final now = DateTime.now();
+    _messageIdTimestamps.removeWhere((id, timestamp) {
+      final isOld = now.difference(timestamp) > _messageIdRetentionDuration;
+      if (isOld) {
+        _receivedMessageIds.remove(id);
+      }
+      return isOld;
+    });
+  }
 
   Future<void> initialize() async {
     await _initializeNotifications();
@@ -336,12 +356,15 @@ class BridgefyController implements BridgefyDelegate {
       }
     }
 
-    // Create JSON message with optional location
+    // NEU: Generiere eindeutige Message-ID
+    final messageId = const Uuid().v4();
+
     final messageData = {
       'text': messageText,
       'timestamp': DateTime.now().toIso8601String(),
       'latitude': position?.latitude,
       'longitude': position?.longitude,
+      'messageId': messageId, // Neu
     };
 
     final jsonString = jsonEncode(messageData);
@@ -362,10 +385,15 @@ class BridgefyController implements BridgefyDelegate {
         isSent: true,
         latitude: position?.latitude,
         longitude: position?.longitude,
+        messageId: messageId, // Neu
       );
       _messages.add(message);
-      onMessageSent?.call(message);
 
+      // NEU: Eigene Message-ID auch tracken, um Echos zu vermeiden
+      _receivedMessageIds.add(messageId);
+      _messageIdTimestamps[messageId] = DateTime.now();
+
+      onMessageSent?.call(message);
       _addLog('Sent: $messageText${position != null ? ' with location' : ''}');
     } catch (e) {
       _addLog('Send failed: $e');
@@ -378,7 +406,6 @@ class BridgefyController implements BridgefyDelegate {
     _addLog('Messages cleared');
   }
 
-  // BridgefyDelegate Implementation
   @override
   void bridgefyDidSendMessage({required String messageID}) {
     _addLog('Message sent: $messageID');
@@ -398,11 +425,25 @@ class BridgefyController implements BridgefyDelegate {
     required String messageId,
     required BridgefyTransmissionMode transmissionMode,
   }) {
+    // NEU: Cleanup alte Message-IDs periodisch
+    _cleanupOldMessageIds();
+
     try {
       final jsonString = utf8.decode(data);
       final Map<String, dynamic> messageData = jsonDecode(jsonString);
 
       final message = MessageItem.fromJson(messageData);
+
+      // NEU: Prüfe ob Message-ID bereits empfangen wurde
+      if (_receivedMessageIds.contains(message.messageId)) {
+        debugPrint('🔄 Duplicate message ignored: ${message.messageId}');
+        return; // Duplikat ignorieren
+      }
+
+      // NEU: Message-ID als empfangen markieren
+      _receivedMessageIds.add(message.messageId);
+      _messageIdTimestamps[message.messageId] = DateTime.now();
+
       _messages.add(message);
       onMessageReceived?.call(message);
 
@@ -413,12 +454,22 @@ class BridgefyController implements BridgefyDelegate {
       _addLog(logText);
       _showEmergencyNotification(message.text);
     } catch (e) {
-      // Fallback for old format (plain text)
+      // Fallback für alte Nachrichten ohne messageId
+      // Verwende messageId von Bridgefy als Fallback
+      if (_receivedMessageIds.contains(messageId)) {
+        debugPrint('🔄 Duplicate message (old format) ignored: $messageId');
+        return;
+      }
+
+      _receivedMessageIds.add(messageId);
+      _messageIdTimestamps[messageId] = DateTime.now();
+
       final text = String.fromCharCodes(data);
       final message = MessageItem(
         text: text,
         timestamp: DateTime.now(),
         isSent: false,
+        messageId: messageId,
       );
       _messages.add(message);
       onMessageReceived?.call(message);
@@ -474,6 +525,7 @@ class BridgefyController implements BridgefyDelegate {
   void bridgefyDidStop() {}
 
   void dispose() {
-    // Cleanup if needed
+    _receivedMessageIds.clear();
+    _messageIdTimestamps.clear();
   }
 }
