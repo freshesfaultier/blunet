@@ -303,7 +303,10 @@ class _MyHomePageState extends State<MyHomePage>
                       onTap: () => _controller.sendMessage(msg.message),
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: msg.color.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(12),
@@ -312,13 +315,30 @@ class _MyHomePageState extends State<MyHomePage>
                             width: 1.5,
                           ),
                         ),
-                        child: Text(
-                          msg.label,
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          textAlign: TextAlign.center,
+                        child: Column(
+                          children: [
+                            Text(
+                              msg.label,
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _getButtonLabel(msg.message),
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                                color: msg.color.withOpacity(0.9),
+                                letterSpacing: 0.3,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -397,17 +417,149 @@ class _MyHomePageState extends State<MyHomePage>
         message.text.contains('HELP');
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        mainAxisAlignment: message.isSent
-            ? MainAxisAlignment.end
-            : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          if (!message.isSent) _buildReceivedIcon(isEmergency),
-          _buildMessageContainer(message, timeStr, isEmergency),
-          if (message.isSent) _buildSentIcon(),
-        ],
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isEmergency
+              ? const Color(0xFFDC2626).withOpacity(0.1)
+              : const Color(0xFF1F2937).withOpacity(0.6),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isEmergency
+                ? const Color(0xFFDC2626).withOpacity(0.3)
+                : Colors.white.withOpacity(0.1),
+            width: 1.5,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: message.isSent
+                        ? const Color(0xFF3B82F6).withOpacity(0.2)
+                        : (isEmergency
+                              ? const Color(0xFFDC2626).withOpacity(0.2)
+                              : const Color(0xFF6B7280).withOpacity(0.2)),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    message.isSent
+                        ? Icons.campaign_outlined
+                        : Icons.notifications_active_outlined,
+                    size: 20,
+                    color: message.isSent
+                        ? const Color(0xFF60A5FA)
+                        : (isEmergency
+                              ? const Color(0xFFEF4444)
+                              : const Color(0xFF9CA3AF)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        message.isSent ? 'STATUS BROADCAST' : 'INCOMING STATUS',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: message.isSent
+                              ? const Color(0xFF60A5FA)
+                              : (isEmergency
+                                    ? const Color(0xFFEF4444)
+                                    : const Color(0xFF9CA3AF)),
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        timeStr,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.white.withOpacity(0.4),
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (message.isSent)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: const Color(0xFF10B981).withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          size: 12,
+                          color: const Color(0xFF10B981),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'SENT',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF10B981),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  if (isEmergency)
+                    Container(
+                      margin: const EdgeInsets.only(right: 12),
+                      child: const Icon(
+                        Icons.warning_rounded,
+                        color: Color(0xFFEF4444),
+                        size: 28,
+                      ),
+                    ),
+                  Expanded(
+                    child: Text(
+                      message.text,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        height: 1.3,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -639,5 +791,15 @@ class _MyHomePageState extends State<MyHomePage>
     } else {
       return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
     }
+  }
+
+  String _getButtonLabel(String message) {
+    if (message.contains('SOS')) return 'SOS';
+    if (message.contains('FIRE')) return 'FIRE';
+    if (message.contains('Medical')) return 'MEDICAL';
+    if (message.contains('HELP')) return 'HELP';
+    if (message.contains('WARNING')) return 'WARNING';
+    if (message.contains('safe')) return 'SAFE';
+    return 'ALERT';
   }
 }
