@@ -38,6 +38,8 @@ dependencies:
   bridgefy: ^1.1.10
   fluttertoast: ^8.2.4
   flutter_local_notifications: ^17.0.0
+  geolocator: ^14.0.2
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

@@ -1,20 +1,48 @@
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:bridgefy/bridgefy.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:geolocator/geolocator.dart';
 
 class MessageItem {
   final String text;
   final DateTime timestamp;
   final bool isSent;
+  final double? latitude;
+  final double? longitude;
 
   MessageItem({
     required this.text,
     required this.timestamp,
     required this.isSent,
+    this.latitude,
+    this.longitude,
   });
+
+  // JSON Serialisierung
+  Map<String, dynamic> toJson() => {
+    'text': text,
+    'timestamp': timestamp.toIso8601String(),
+    'latitude': latitude,
+    'longitude': longitude,
+  };
+
+  factory MessageItem.fromJson(Map<String, dynamic> json) => MessageItem(
+    text: json['text'] as String,
+    timestamp: DateTime.parse(json['timestamp'] as String),
+    isSent: false,
+    latitude: json['latitude'] as double?,
+    longitude: json['longitude'] as double?,
+  );
+
+  bool get hasLocation => latitude != null && longitude != null;
+
+  String get locationString => hasLocation
+      ? '${latitude!.toStringAsFixed(6)}, ${longitude!.toStringAsFixed(6)}'
+      : 'No location';
 }
 
 class EmergencyMessage {
@@ -187,12 +215,45 @@ class BridgefyController implements BridgefyDelegate {
       if (await Permission.locationWhenInUse.isDenied) {
         await Permission.locationWhenInUse.request();
       }
+      await Permission.location.request();
       await Permission.bluetoothAdvertise.request();
       await Permission.bluetoothScan.request();
       await Permission.bluetoothConnect.request();
       await Permission.notification.request();
     } catch (e) {
       _addLog('Permission request error: $e');
+    }
+  }
+
+  Future<Position?> _getCurrentLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _addLog('Location services are disabled');
+        return null;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          _addLog('Location permissions are denied');
+          return null;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        _addLog('Location permissions are permanently denied');
+        return null;
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      return position;
+    } catch (e) {
+      _addLog('Error getting location: $e');
+      return null;
     }
   }
 
@@ -237,7 +298,10 @@ class BridgefyController implements BridgefyDelegate {
     _addLog('Connected peers: $len');
   }
 
-  Future<void> sendMessage(String messageText) async {
+  Future<void> sendMessage(
+    String messageText, {
+    bool includeLocation = false,
+  }) async {
     if (!_started) {
       _addLog('Bridgefy not started');
       return;
@@ -247,7 +311,25 @@ class BridgefyController implements BridgefyDelegate {
       return;
     }
 
-    final data = Uint8List.fromList(messageText.codeUnits);
+    Position? position;
+    if (includeLocation) {
+      position = await _getCurrentLocation();
+      if (position != null) {
+        _addLog('Location: ${position.latitude}, ${position.longitude}');
+      }
+    }
+
+    // Create JSON message with optional location
+    final messageData = {
+      'text': messageText,
+      'timestamp': DateTime.now().toIso8601String(),
+      'latitude': position?.latitude,
+      'longitude': position?.longitude,
+    };
+
+    final jsonString = jsonEncode(messageData);
+    final data = Uint8List.fromList(utf8.encode(jsonString));
+
     try {
       await _bridgefy.send(
         data: data,
@@ -261,11 +343,13 @@ class BridgefyController implements BridgefyDelegate {
         text: messageText,
         timestamp: DateTime.now(),
         isSent: true,
+        latitude: position?.latitude,
+        longitude: position?.longitude,
       );
       _messages.add(message);
       onMessageSent?.call(message);
 
-      _addLog('Sent: $messageText');
+      _addLog('Sent: $messageText${position != null ? ' with location' : ''}');
     } catch (e) {
       _addLog('Send failed: $e');
     }
@@ -297,16 +381,33 @@ class BridgefyController implements BridgefyDelegate {
     required String messageId,
     required BridgefyTransmissionMode transmissionMode,
   }) {
-    final text = String.fromCharCodes(data);
-    final message = MessageItem(
-      text: text,
-      timestamp: DateTime.now(),
-      isSent: false,
-    );
-    _messages.add(message);
-    onMessageReceived?.call(message);
-    _addLog('📨 Received: $text');
-    _showEmergencyNotification(text);
+    try {
+      final jsonString = utf8.decode(data);
+      final Map<String, dynamic> messageData = jsonDecode(jsonString);
+
+      final message = MessageItem.fromJson(messageData);
+      _messages.add(message);
+      onMessageReceived?.call(message);
+
+      String logText = '📨 Received: ${message.text}';
+      if (message.hasLocation) {
+        logText += ' (Location: ${message.locationString})';
+      }
+      _addLog(logText);
+      _showEmergencyNotification(message.text);
+    } catch (e) {
+      // Fallback for old format (plain text)
+      final text = String.fromCharCodes(data);
+      final message = MessageItem(
+        text: text,
+        timestamp: DateTime.now(),
+        isSent: false,
+      );
+      _messages.add(message);
+      onMessageReceived?.call(message);
+      _addLog('📨 Received: $text');
+      _showEmergencyNotification(text);
+    }
   }
 
   @override

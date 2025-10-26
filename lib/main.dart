@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'bridgefy_controller.dart';
 
 void main() {
@@ -238,7 +239,8 @@ class _MyHomePageState extends State<MyHomePage>
         content: Text(
           'Initialized: ${_controller.initialized}\n'
           'Started: ${_controller.started}\n\n'
-          'Emergency messages trigger notifications on receiving devices.',
+          'Emergency messages trigger notifications on receiving devices.\n\n'
+          'Quick actions automatically include GPS coordinates.',
           style: const TextStyle(color: Colors.white70),
         ),
         actions: [
@@ -300,7 +302,10 @@ class _MyHomePageState extends State<MyHomePage>
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: () => _controller.sendMessage(msg.message),
+                      onTap: () => _controller.sendMessage(
+                        msg.message,
+                        includeLocation: true,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -502,21 +507,21 @@ class _MyHomePageState extends State<MyHomePage>
                         color: const Color(0xFF10B981).withOpacity(0.3),
                       ),
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
                           Icons.check_circle_outline,
                           size: 12,
-                          color: const Color(0xFF10B981),
+                          color: Color(0xFF10B981),
                         ),
-                        const SizedBox(width: 4),
+                        SizedBox(width: 4),
                         Text(
                           'SENT',
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.w700,
-                            color: const Color(0xFF10B981),
+                            color: Color(0xFF10B981),
                             letterSpacing: 0.5,
                           ),
                         ),
@@ -546,7 +551,7 @@ class _MyHomePageState extends State<MyHomePage>
                   Expanded(
                     child: Text(
                       message.text,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -558,139 +563,67 @@ class _MyHomePageState extends State<MyHomePage>
                 ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildReceivedIcon(bool isEmergency) {
-    return Container(
-      margin: const EdgeInsets.only(right: 6, bottom: 4),
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        color: isEmergency
-            ? const Color(0xFFDC2626).withOpacity(0.2)
-            : const Color(0xFF374151).withOpacity(0.5),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isEmergency
-              ? const Color(0xFFDC2626).withOpacity(0.4)
-              : Colors.white.withOpacity(0.1),
-          width: 1,
-        ),
-      ),
-      child: Icon(
-        Icons.arrow_downward_rounded,
-        size: 14,
-        color: isEmergency
-            ? const Color(0xFFEF4444)
-            : Colors.white.withOpacity(0.7),
-      ),
-    );
-  }
-
-  Widget _buildSentIcon() {
-    return Container(
-      margin: const EdgeInsets.only(left: 6, bottom: 4),
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        color: const Color(0xFF3B82F6).withOpacity(0.2),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: const Color(0xFF3B82F6).withOpacity(0.4),
-          width: 1,
-        ),
-      ),
-      child: const Icon(
-        Icons.arrow_upward_rounded,
-        size: 14,
-        color: Color(0xFF60A5FA),
-      ),
-    );
-  }
-
-  Widget _buildMessageContainer(
-    MessageItem message,
-    String timeStr,
-    bool isEmergency,
-  ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      constraints: BoxConstraints(
-        maxWidth: MediaQuery.of(context).size.width * 0.75,
-      ),
-      decoration: BoxDecoration(
-        gradient: message.isSent
-            ? const LinearGradient(
-                colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
-              )
-            : (isEmergency
-                  ? const LinearGradient(
-                      colors: [Color(0xFFDC2626), Color(0xFFB91C1C)],
-                    )
-                  : const LinearGradient(
-                      colors: [Color(0xFF1F2937), Color(0xFF374151)],
-                    )),
-        borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(20),
-          topRight: const Radius.circular(20),
-          bottomLeft: message.isSent
-              ? const Radius.circular(20)
-              : const Radius.circular(6),
-          bottomRight: message.isSent
-              ? const Radius.circular(6)
-              : const Radius.circular(20),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color:
-                (message.isSent
-                        ? const Color(0xFF3B82F6)
-                        : (isEmergency
-                              ? const Color(0xFFDC2626)
-                              : const Color(0xFF000000)))
-                    .withOpacity(0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            message.text,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w400,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                timeStr,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w400,
+            if (message.hasLocation) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3B82F6).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: const Color(0xFF3B82F6).withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.location_on,
+                      color: Color(0xFF60A5FA),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'LOCATION',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF60A5FA),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            message.locationString,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.white.withOpacity(0.8),
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.open_in_new,
+                        color: Color(0xFF60A5FA),
+                        size: 18,
+                      ),
+                      onPressed: () =>
+                          _openInMaps(message.latitude!, message.longitude!),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
                 ),
               ),
-              if (message.isSent) ...[
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.done_all,
-                  size: 14,
-                  color: Colors.white.withOpacity(0.6),
-                ),
-              ],
             ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -801,5 +734,83 @@ class _MyHomePageState extends State<MyHomePage>
     if (message.contains('WARNING')) return 'WARNING';
     if (message.contains('safe')) return 'SAFE';
     return 'ALERT';
+  }
+
+  void _openInMaps(double latitude, double longitude) async {
+    // Versuche verschiedene URL-Formate
+    final List<String> urls = [
+      'geo:$latitude,$longitude?q=$latitude,$longitude', // Android native
+      'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude', // Google Maps Web
+      'https://maps.google.com/?q=$latitude,$longitude', // Alternative Google Maps
+    ];
+
+    bool opened = false;
+
+    for (String urlString in urls) {
+      try {
+        final uri = Uri.parse(urlString);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          opened = true;
+          break;
+        }
+      } catch (e) {
+        debugPrint('Failed to open URL: $urlString - Error: $e');
+      }
+    }
+
+    if (!opened && mounted) {
+      // Zeige Koordinaten im Dialog als Fallback
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF1F2937),
+          title: const Row(
+            children: [
+              Icon(Icons.location_on, color: Color(0xFF60A5FA)),
+              SizedBox(width: 8),
+              Text('Location', style: TextStyle(color: Colors.white)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Coordinates:',
+                style: TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+              const SizedBox(height: 8),
+              SelectableText(
+                '$latitude, $longitude',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Copy these coordinates to use in your maps app.',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.5),
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Close',
+                style: TextStyle(color: Color(0xFF60A5FA)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
   }
 }
