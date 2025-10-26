@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
-
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+<uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
 <uses-permission-sdk-23 android:name="android.permission.ACCESS_COARSE_LOCATION"  
     android:maxSdkVersion="30"  
     tools:node="replace" />  
@@ -8,6 +9,21 @@
     android:maxSdkVersion="32" tools:replace="android:maxSdkVersion" />  
   <uses-permission android:name="android.permission.BLUETOOTH_SCAN" tools:node="replace" />  
   <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+<queries>
+    <intent>
+        <action android:name="android.intent.action.VIEW" />
+        <data android:scheme="https" />
+    </intent>
+    <intent>
+        <action android:name="android.intent.action.VIEW" />
+        <data android:scheme="http" />
+    </intent>
+    <intent>
+        <action android:name="android.intent.action.VIEW" />
+        <data android:scheme="geo" />
+    </intent>
+</queries>
 
     <application
     
