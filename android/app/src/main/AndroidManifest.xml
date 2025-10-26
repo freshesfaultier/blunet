@@ -27,7 +27,7 @@
 
     <application
     
-        android:label="flutter_application_3"
+        android:label="BluNET"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
