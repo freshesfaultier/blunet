@@ -163,31 +163,65 @@ class _MyHomePageState extends State<MyHomePage>
         ],
       ),
       actions: [
-        IconButton(
-          icon: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              const Icon(Icons.people_outline, color: Colors.white70),
-              if (_controller.started)
-                Positioned(
-                  right: -2,
-                  top: -2,
-                  child: Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF10B981),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color(0xFF141921),
-                        width: 2,
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            IconButton(
+              icon: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(Icons.people_outline, color: Colors.white70),
+                  if (_controller.started)
+                    Positioned(
+                      right: -2,
+                      top: -2,
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(0xFF141921),
+                            width: 2,
+                          ),
+                        ),
                       ),
+                    ),
+                ],
+              ),
+              onPressed: _controller.checkPeers,
+            ),
+            if (_controller.started)
+              Positioned(
+                right: 4,
+                bottom: 4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _controller.connectedPeersCount > 0
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFF6B7280),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFF141921),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Text(
+                    '${_controller.connectedPeersCount}',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
                 ),
-            ],
-          ),
-          onPressed: _controller.checkPeers,
+              ),
+          ],
         ),
         _buildMenu(),
       ],
@@ -238,7 +272,8 @@ class _MyHomePageState extends State<MyHomePage>
         title: const Text('Status', style: TextStyle(color: Colors.white)),
         content: Text(
           'Initialized: ${_controller.initialized}\n'
-          'Started: ${_controller.started}\n\n'
+          'Started: ${_controller.started}\n'
+          'Connected Peers: ${_controller.connectedPeersCount}\n\n'
           'Emergency messages trigger notifications on receiving devices.\n\n'
           'Quick actions automatically include GPS coordinates.',
           style: const TextStyle(color: Colors.white70),
@@ -737,11 +772,10 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   void _openInMaps(double latitude, double longitude) async {
-    // Versuche verschiedene URL-Formate
     final List<String> urls = [
-      'geo:$latitude,$longitude?q=$latitude,$longitude', // Android native
-      'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude', // Google Maps Web
-      'https://maps.google.com/?q=$latitude,$longitude', // Alternative Google Maps
+      'geo:$latitude,$longitude?q=$latitude,$longitude',
+      'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude',
+      'https://maps.google.com/?q=$latitude,$longitude',
     ];
 
     bool opened = false;
@@ -760,7 +794,6 @@ class _MyHomePageState extends State<MyHomePage>
     }
 
     if (!opened && mounted) {
-      // Zeige Koordinaten im Dialog als Fallback
       showDialog(
         context: context,
         builder: (context) => AlertDialog(

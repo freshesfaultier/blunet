@@ -60,6 +60,7 @@ class BridgefyController implements BridgefyDelegate {
 
   bool _initialized = false;
   bool _started = false;
+  int _connectedPeersCount = 0;
   final List<String> _log = [];
   final List<MessageItem> _messages = [];
 
@@ -79,6 +80,7 @@ class BridgefyController implements BridgefyDelegate {
   // Getters
   bool get initialized => _initialized;
   bool get started => _started;
+  int get connectedPeersCount => _connectedPeersCount;
   List<String> get log => List.unmodifiable(_log);
   List<MessageItem> get messages => List.unmodifiable(_messages);
 
@@ -272,6 +274,7 @@ class BridgefyController implements BridgefyDelegate {
       onStateChanged?.call();
       if (_started) {
         _addLog('Bridgefy started!');
+        _updatePeerCount();
       } else {
         _addLog('Sorry! could not start bridgefy');
       }
@@ -285,6 +288,7 @@ class BridgefyController implements BridgefyDelegate {
       await _bridgefy.stop();
       final started = await _bridgefy.isStarted;
       _started = started;
+      _connectedPeersCount = 0;
       onStateChanged?.call();
       _addLog('Bridgefy stopped');
     } catch (e) {
@@ -292,10 +296,23 @@ class BridgefyController implements BridgefyDelegate {
     }
   }
 
+  Future<void> _updatePeerCount() async {
+    try {
+      List<String> connectedPeers = await _bridgefy.connectedPeers;
+      _connectedPeersCount = connectedPeers.length;
+      onStateChanged?.call();
+    } catch (e) {
+      debugPrint('Error updating peer count: $e');
+    }
+  }
+
   Future<void> checkPeers() async {
     List<String> connectedPeers = await _bridgefy.connectedPeers;
     int len = connectedPeers.length;
+    _connectedPeersCount = len;
+    onStateChanged?.call();
     _addLog('Connected peers: $len');
+    print(connectedPeers);
   }
 
   Future<void> sendMessage(
@@ -411,12 +428,16 @@ class BridgefyController implements BridgefyDelegate {
   }
 
   @override
-  void bridgefyDidConnect({required String userID}) =>
-      _addLog('✅ Peer connected');
+  void bridgefyDidConnect({required String userID}) {
+    _addLog('✅ Peer connected');
+    _updatePeerCount();
+  }
 
   @override
-  void bridgefyDidDisconnect({required String userID}) =>
-      _addLog('❌ Peer disconnected');
+  void bridgefyDidDisconnect({required String userID}) {
+    _addLog('❌ Peer disconnected');
+    _updatePeerCount();
+  }
 
   @override
   void bridgefyDidDestroySession() {}
